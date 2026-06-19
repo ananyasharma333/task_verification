@@ -8,6 +8,8 @@ from app.config.settings import settings
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+from app.routes import auth
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup event
@@ -22,6 +24,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+app.include_router(auth.router)
 
 @app.get("/api/health", tags=["Health Check"])
 async def health_check():
