@@ -13,8 +13,12 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
   
   // Tabs and Analytics state
-  const [activeTab, setActiveTab] = useState('tasks');
+  const [activeTab, setActiveTab] = useState('tasks'); // 'tasks', 'analytics', 'leaves'
   const [analytics, setAnalytics] = useState(null);
+  
+  // Leaves state
+  const [leaves, setLeaves] = useState([]);
+  const [reviewLeave, setReviewLeave] = useState(null);
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -38,6 +42,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchTasks();
     fetchAnalytics();
+    fetchLeaves();
   }, []);
 
   const fetchTasks = async () => {
@@ -59,6 +64,15 @@ const AdminDashboard = () => {
       setAnalytics(response.data);
     } catch (err) {
       console.error('Failed to fetch analytics', err);
+    }
+  };
+
+  const fetchLeaves = async () => {
+    try {
+      const response = await api.get('/api/leaves/admin');
+      setLeaves(response.data);
+    } catch (err) {
+      console.error('Failed to fetch leaves', err);
     }
   };
 
@@ -126,6 +140,24 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleReviewLeave = async (status) => {
+    if (!reviewLeave) return;
+    setReviewing(true);
+    try {
+      await api.put(`/api/leaves/${reviewLeave.id}/review`, {
+        status,
+        admin_remarks: adminRemarks
+      });
+      setReviewLeave(null);
+      setAdminRemarks('');
+      fetchLeaves();
+    } catch (err) {
+      alert("Failed to review leave");
+    } finally {
+      setReviewing(false);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'Pending': return 'bg-yellow-100 text-yellow-800';
@@ -162,6 +194,17 @@ const AdminDashboard = () => {
               >
                 <BarChart3 className="w-4 h-4 mr-1.5" />
                 Analytics
+              </button>
+              <button 
+                onClick={() => setActiveTab('leaves')}
+                className={`flex items-center px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'leaves' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                Leave Requests
+                {leaves.filter(l => l.status === 'Pending').length > 0 && (
+                  <span className="ml-2 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                    {leaves.filter(l => l.status === 'Pending').length}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -245,6 +288,53 @@ const AdminDashboard = () => {
                         <td className="px-6 py-4 text-right">
                           <button 
                             onClick={() => { setReviewTask(task); setAdminRemarks(task.admin_remarks || ''); }}
+                            className="text-primary-600 hover:text-primary-800 font-medium text-sm"
+                          >
+                            Review
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : activeTab === 'leaves' ? (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-200 bg-slate-50/50">
+              <h2 className="font-semibold text-slate-800">Employee Leave Requests</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-slate-500 bg-slate-50 uppercase border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-3 font-medium">Employee</th>
+                    <th className="px-6 py-3 font-medium">Dates</th>
+                    <th className="px-6 py-3 font-medium">Reason</th>
+                    <th className="px-6 py-3 font-medium">Status</th>
+                    <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaves.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-8 text-center text-slate-500">No leave requests found.</td>
+                    </tr>
+                  ) : (
+                    leaves.map((leave) => (
+                      <tr key={leave.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 font-medium text-slate-900">{leave.employee_name}</td>
+                        <td className="px-6 py-4">{leave.start_date} to {leave.end_date}</td>
+                        <td className="px-6 py-4 max-w-xs truncate">{leave.reason}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(leave.status)}`}>
+                            {leave.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => { setReviewLeave(leave); setAdminRemarks(leave.admin_remarks || ''); }}
                             className="text-primary-600 hover:text-primary-800 font-medium text-sm"
                           >
                             Review
@@ -552,6 +642,80 @@ const AdminDashboard = () => {
                   <p className="text-slate-500 text-sm">This task has not been submitted by the employee yet.</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Leave Modal */}
+      {reviewLeave && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-lg max-w-lg w-full">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className="text-xl font-semibold text-slate-900">Review Leave Request</h2>
+              <button onClick={() => setReviewLeave(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-sm font-medium text-slate-500 mb-1">Employee</p>
+                <p className="text-slate-900 font-semibold">{reviewLeave.employee_name}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">Start Date</p>
+                  <p className="text-slate-800">{reviewLeave.start_date}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">End Date</p>
+                  <p className="text-slate-800">{reviewLeave.end_date}</p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-sm font-medium text-slate-500 mb-1">Reason</p>
+                <p className="text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">{reviewLeave.reason}</p>
+              </div>
+              
+              <div className="border-t border-slate-100 pt-4 mt-6">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Admin Remarks (Optional)</label>
+                <textarea 
+                  rows="2" 
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 mb-4"
+                  placeholder="Reason for approval/rejection..."
+                  value={adminRemarks} 
+                  onChange={e => setAdminRemarks(e.target.value)}
+                ></textarea>
+                
+                {reviewLeave.status === 'Pending' ? (
+                  <div className="flex justify-end gap-2">
+                    <button 
+                      onClick={() => handleReviewLeave('Rejected')} 
+                      disabled={reviewing}
+                      className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                    >
+                      Reject
+                    </button>
+                    <button 
+                      onClick={() => handleReviewLeave('Approved')} 
+                      disabled={reviewing}
+                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                    >
+                      Approve
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex justify-end">
+                    <button 
+                      onClick={() => setReviewLeave(null)} 
+                      className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

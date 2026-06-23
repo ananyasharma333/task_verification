@@ -8,7 +8,12 @@ const EmployeeDashboard = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('pending'); // 'pending' or 'completed'
+  const [activeTab, setActiveTab] = useState('pending'); // 'pending', 'completed', or 'leaves'
+  
+  // Leaves state
+  const [leaves, setLeaves] = useState([]);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ start_date: '', end_date: '', reason: '' });
   
   // Modal state
   const [selectedTask, setSelectedTask] = useState(null);
@@ -24,6 +29,7 @@ const EmployeeDashboard = () => {
 
   useEffect(() => {
     fetchTasks();
+    fetchLeaves();
   }, []);
 
   const fetchTasks = async () => {
@@ -47,6 +53,15 @@ const EmployeeDashboard = () => {
       setError('Failed to fetch tasks.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLeaves = async () => {
+    try {
+      const response = await api.get('/api/leaves/employee');
+      setLeaves(response.data);
+    } catch (err) {
+      console.error("Failed to fetch leaves", err);
     }
   };
 
@@ -81,6 +96,23 @@ const EmployeeDashboard = () => {
     } catch (err) {
       console.error("Failed to submit task", err);
       alert("Failed to submit task. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitLeave = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await api.post('/api/leaves', leaveForm);
+      setShowLeaveModal(false);
+      setLeaveForm({ start_date: '', end_date: '', reason: '' });
+      fetchLeaves();
+      alert("Leave request submitted successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit leave request.");
     } finally {
       setSubmitting(false);
     }
@@ -153,7 +185,23 @@ const EmployeeDashboard = () => {
               >
                 Completed / History ({completedTasks.length})
               </button>
+              <button
+                onClick={() => setActiveTab('leaves')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 'leaves' ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                My Leaves
+              </button>
             </div>
+            
+            {/* Request Leave Button */}
+            <button 
+              onClick={() => setShowLeaveModal(true)}
+              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm"
+            >
+              Request Leave
+            </button>
             
             {/* Profile Link */}
             <a 
@@ -176,8 +224,44 @@ const EmployeeDashboard = () => {
           </div>
         )}
 
-        {/* Task Grid */}
-        {loading ? (
+        {/* Dynamic Content */}
+        {activeTab === 'leaves' ? (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-6">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">My Leave Requests</h2>
+            {leaves.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-8">You have no leave requests.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-slate-500 bg-slate-50 uppercase border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Dates</th>
+                      <th className="px-4 py-3 font-medium">Reason</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Admin Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaves.map(leave => (
+                      <tr key={leave.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-4 py-3 whitespace-nowrap">{leave.start_date} to {leave.end_date}</td>
+                        <td className="px-4 py-3 text-slate-600 max-w-xs truncate">{leave.reason}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusColor(leave.status)}`}>
+                            {leave.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 italic text-xs">{leave.admin_remarks || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {loading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
           </div>
@@ -221,13 +305,58 @@ const EmployeeDashboard = () => {
                   <button 
                     onClick={(e) => { e.stopPropagation(); openModal(task); }}
                     className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
-                  >
-                    View Details →
-                  </button>
-                </div>
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
               </div>
-            ))}
-          </div>
+            ) : displayedTasks.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+                <ClipboardList className="mx-auto h-12 w-12 text-slate-300 mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-1">No tasks found</h3>
+                <p className="text-slate-500 text-sm">
+                  {activeTab === 'pending' ? "You're all caught up! No pending tasks assigned." : "No completed tasks yet."}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {displayedTasks.map((task) => (
+                  <div 
+                    key={task._id || task.id} 
+                    className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow cursor-pointer group"
+                    onClick={() => openModal(task)}
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusColor(task.status)}`}>
+                        {task.status}
+                      </span>
+                      <span className="text-xs font-medium text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                        {task.department}
+                      </span>
+                    </div>
+                    
+                    <h3 className="font-semibold text-slate-900 text-lg mb-2 group-hover:text-primary-600 transition-colors">
+                      {task.title}
+                    </h3>
+                    <p className="text-slate-500 text-sm line-clamp-2 mb-4">
+                      {task.description}
+                    </p>
+                    
+                    <div className="pt-4 border-t border-slate-100 flex justify-between items-center mt-auto">
+                      <div className="flex items-center text-xs text-slate-500">
+                        <Clock className="w-3.5 h-3.5 mr-1" />
+                        Priority: <span className="font-medium ml-1 text-slate-700">{task.priority}</span>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); openModal(task); }}
+                        className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+                      >
+                        View Details →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
       </div>
@@ -376,6 +505,47 @@ const EmployeeDashboard = () => {
                 </form>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Request Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-slate-900">Request Leave</h2>
+              <button onClick={() => setShowLeaveModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitLeave} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+                  <input required type="date" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500" 
+                    value={leaveForm.start_date} onChange={e => setLeaveForm({...leaveForm, start_date: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                  <input required type="date" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500" 
+                    value={leaveForm.end_date} onChange={e => setLeaveForm({...leaveForm, end_date: e.target.value})} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Reason for Leave</label>
+                <textarea required rows="3" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                  value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})}></textarea>
+              </div>
+              <div className="pt-4 flex justify-end gap-2">
+                <button type="button" onClick={() => setShowLeaveModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50">
+                  {submitting ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
