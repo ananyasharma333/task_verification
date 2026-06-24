@@ -6,12 +6,16 @@ import pymongo
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.database import connect_to_mongo, close_mongo_connection
 from app.config.settings import settings
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+# Ensure uploads directory exists
+os.makedirs("uploads", exist_ok=True)
 
 from app.routes import auth, fields, tasks, users, analytics, leaves
 
@@ -29,6 +33,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Mount local uploads folder to serve uploaded proof images
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Global CORS Middleware
 # Configure this via FRONTEND_URL in production, fallback to generic dev ones

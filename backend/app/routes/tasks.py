@@ -116,17 +116,23 @@ async def submit_task(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="dynamic_data must be a valid JSON string")
         
-    # Upload to cloudinary
+    # Upload to cloudinary or local
+    secure_url = ""
     try:
-        upload_result = cloudinary.uploader.upload(proof_image.file)
-        secure_url = upload_result.get("secure_url")
-    except Exception as e:
-        # If cloudinary fails (e.g. no credentials), we can simulate or throw
-        if not settings.CLOUDINARY_URL:
-            # For local testing without Cloudinary credentials, we can just save a mock URL
-            secure_url = "https://mock-cloudinary-url.com/proof.jpg"
+        if settings.CLOUDINARY_URL:
+            upload_result = cloudinary.uploader.upload(proof_image.file)
+            secure_url = upload_result.get("secure_url")
         else:
-            raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
+            import shutil
+            import uuid
+            # Ensure safe unique filename
+            filename = f"{uuid.uuid4()}_{proof_image.filename}"
+            file_path = f"uploads/{filename}"
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(proof_image.file, buffer)
+            secure_url = f"http://localhost:8000/uploads/{filename}"
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
             
     # Update the task
     update_data = {
