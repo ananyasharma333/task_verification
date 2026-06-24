@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/axios';
-import { ClipboardList, CheckCircle2, Clock, AlertCircle, Upload, X } from 'lucide-react';
+import { ClipboardList, CheckCircle2, Clock, AlertCircle, Upload, X, Bell } from 'lucide-react';
 
 const EmployeeDashboard = () => {
   const { user } = useContext(AuthContext);
@@ -14,6 +14,15 @@ const EmployeeDashboard = () => {
   const [leaves, setLeaves] = useState([]);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ start_date: '', end_date: '', reason: '' });
+  const [dismissedNotifs, setDismissedNotifs] = useState(() => {
+    return JSON.parse(localStorage.getItem('dismissedLeaves') || '[]');
+  });
+
+  const dismissNotification = (id) => {
+    const newDismissed = [...dismissedNotifs, id];
+    setDismissedNotifs(newDismissed);
+    localStorage.setItem('dismissedLeaves', JSON.stringify(newDismissed));
+  };
   
   // Modal state
   const [selectedTask, setSelectedTask] = useState(null);
@@ -223,6 +232,23 @@ const EmployeeDashboard = () => {
             {error}
           </div>
         )}
+
+        {/* Notifications */}
+        {leaves.filter(l => l.status !== 'Pending' && !dismissedNotifs.includes(l.id || l._id)).map(leave => (
+          <div key={`notif-${leave.id || leave._id}`} className={`mb-6 p-4 rounded-lg flex items-start justify-between text-sm border shadow-sm ${leave.status === 'Approved' ? 'bg-green-50 text-green-900 border-green-200' : 'bg-red-50 text-red-900 border-red-200'}`}>
+            <div className="flex items-start">
+              <Bell className={`w-5 h-5 mr-3 mt-0.5 ${leave.status === 'Approved' ? 'text-green-600' : 'text-red-600'}`} />
+              <div>
+                <h4 className="font-semibold mb-1">Leave Request {leave.status}</h4>
+                <p>Your leave request for <strong>{leave.start_date}</strong> to <strong>{leave.end_date}</strong> has been <strong>{leave.status}</strong> by the admin.</p>
+                {leave.admin_remarks && <p className="mt-1 italic text-slate-600">Remarks: {leave.admin_remarks}</p>}
+              </div>
+            </div>
+            <button onClick={() => dismissNotification(leave.id || leave._id)} className="text-slate-400 hover:text-slate-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        ))}
 
         {/* Dynamic Content */}
         {activeTab === 'leaves' ? (
