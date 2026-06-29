@@ -153,7 +153,9 @@ async def submit_task(
             file_path = f"uploads/{filename}"
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(proof_image.file, buffer)
-            secure_url = f"http://localhost:8000/uploads/{filename}"
+            
+            base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
+            secure_url = f"{base_url}/uploads/{filename}"
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
             
