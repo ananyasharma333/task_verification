@@ -25,7 +25,7 @@ const Login = () => {
         navigate('/employee/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to login. Please check your credentials.');
+      setError(err.response?.data?.detail || err.message || 'Failed to login. Please check your credentials.');
     } finally {
       setLoading(false);
     }

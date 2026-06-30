@@ -30,7 +30,7 @@ const Register = () => {
       // Automatically redirect to login after successful registration
       navigate('/login', { state: { message: 'Registration successful! Please login.' } });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to register. Please try again.');
+      setError(err.response?.data?.detail || err.message || 'Failed to register. Please try again.');
     } finally {
       setLoading(false);
     }
